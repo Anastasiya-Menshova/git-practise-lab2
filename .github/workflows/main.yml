@@ -1,68 +1,59 @@
-name: Combined CI/CD
+name: CI/CD Pipeline
 
 on:
   push:
-    branches: ["main", "development"]
+    branches:
+      - main
+      - development
+      - release
   pull_request:
-    branches: ["main", "development"]
+    branches:
+      - main
 
 jobs:
-  build-app:
+  build:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout репозитория
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Установка Python
+        uses: actions/setup-python@v2
         with:
-          python-version: "3.x"
+          python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Установка зависимостей
         run: |
-          pip install -r requirements.txt -r requirements-dev.txt
+          pip install pytest  # Установка pytest
 
-      - name: Run tests
-        run: pytest
+      - name: Запуск тестов
+        run: |
+          python -m pytest  # Запуск тестов
 
-  build-docs:
+  generate_docs:
+    needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout репозитория
+        uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.x"
+      - name: Генерация документации
+        run: |
+          mkdir -p docs
+          echo "## Документация проекта" > docs/index.md
+          echo "Документация обновлена автоматически" >> docs/index.md
 
-      - name: Install documentation dependencies
-        run: pip install -r requirements-dev.txt
+      - name: Коммит и пуш обновленной документации
+        run: |
+          git config --global user.name "github-actions"
+          git config --global user.email "github-actions@github.com"
+          git add docs/
+          git commit -m "Автоматическое обновление документации"
+          git push origin release || echo "Нет изменений для коммита"
 
-      - name: Build documentation
-        run: mkdocs build
-
-      - name: Deploy to GitHub Pages
-        # if: github.ref == 'refs/heads/main'
-        uses: peaceiris/actions-gh-pages@v3
-        with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
-          keep_files: false
-          user_name: "ariinabel"
-          user_email: "arina_belyakova04@mail.ru"
-
-  automerge:
-    needs: [build-app, build-docs]
+  deploy:
+    needs: generate_docs
     runs-on: ubuntu-latest
-    # if: |
-    #   github.event_name == 'pull_request' &&
-    #   github.event.pull_request.user.login == 'dependabot[bot]'
-    permissions:
-      contents: write
-      pull-requests: write
     steps:
-      - name: Enable auto-merge
-        uses: peter-evans/enable-pull-request-automerge@v3
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          pull-request-number: ${{ github.event.pull_request.number }}
-          merge-method: squash
+      - name: Деплой приложения
+        run: echo "Развертывание приложения..."
